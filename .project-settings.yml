@@ -1,4 +1,5 @@
-extensions: {}
+extensions:
+  OverloadedStrings: true
 cabal-file: project.cabal
 version: 1
 module-template: ! 'module MODULE_NAME where

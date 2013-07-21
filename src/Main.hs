@@ -4,18 +4,22 @@ module Main where
 
 import Network.HTTP
 import Data.Aeson
+import Data.Aeson.Types
 import Network.URI
 import Network.HTTP.Types.URI(renderQuery)
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Lazy as BL
 import Control.Arrow
 import Data.Maybe(catMaybes, fromJust)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as E
 
 targetAddress = "568 Broadway, New York, NY"
 
 -- | Simpler variant of renderQuery that deals with Strings.
 renderQueryS :: [(String, Maybe String)] -> String
-renderQueryS = BS.unpack . renderQuery True . packItems
-  where packItems = map (BS.pack *** fmap BS.pack)
+renderQueryS = B.unpack . renderQuery True . packItems
+  where packItems = map (B.pack *** fmap B.pack)
 
 type LatLng = (Double, Double)
 
@@ -29,17 +33,30 @@ data FoursquareEndpoint =
     VenuesTrendingEndpoint { ll :: LatLng, limit :: Maybe Int, radius :: Maybe Double } -- v2/venues/trending
 
 withFoursquareResponse :: (Object -> Parser a) -> Value -> Parser a
-withFoursquareResponse f v = withObject "" parseResponse v
-  where parseResponse o = do res <- o .: "response"
-                             withObject "" f res
+withFoursquareResponse f v = withObject "object" parseResponse v
+  where parseResponse o = do res <- o .: (T.pack "response")
+                             withObject "response object" f res
 
 data Venue = Venue { id :: String, name :: String }
 
 data VenuesTrendingResponse = VenuesTrendingResponse { venues :: [Venue] }
 instance FromJSON VenuesTrendingResponse where
-  --parseJSON = withObject "" parseResponse
+  parseJSON = undefined
+
+--parseJSON = withObject "" parseResponse
+
+packLazyByteString :: String -> BL.ByteString
+packLazyByteString = BL.pack . map (toEnum . fromEnum)
 
 callJsonEndpoint :: (FromJSON j, Endpoint e) => e -> IO j
+callJsonEndpoint e =
+  do responseBody <- simpleHTTP (getRequest $ show $ buildURI e) >>= getResponseBody
+     responseJson <- case decode (packLazyByteString responseBody) of
+                       Nothing -> fail "endpoint responded with invalid json"
+                       (Just json) -> return json
+     case parseEither parseJSON responseJson of
+       (Left err) -> fail err
+       (Right res) -> return res
 
 -- https://developers.google.com/maps/documentation/geocoding/
 data GeocoderEndpoint =
@@ -58,10 +75,10 @@ instance Endpoint GeocoderEndpoint where
 -- | The main entry point.
 main :: IO ()
 main =
-  do geocodeResponse :: GeocodeResponse
-     geocodeResponse <- callJsonEndpoint (GeocodeEndpoint targetAddress False)
+  do putStrLn "initializing"
+     --geocodeResponse <- callJsonEndpoint (GeocodeEndpoint targetAddress False)
 --main = do putStrLn "YO WHATS UP"
   --putStrLn $ show $ buildURI $ VenuesTrending (2.0, 3.0) Nothing Nothing
   --res <- simpleHTTP (getRequest "http://www.haskell.org/") >>= fmap (take 100) . getResponseBody
-  --BS.putStrLn $ renderQuery False [(BS.pack "hey", Just $ BS.pack "you")]
+  --B.putStrLn $ renderQuery False [(B.pack "hey", Just $ B.pack "you")]
   --putStrLn $ show $ buildURI $ VenuesTrending (2.0, 3.0) Nothing Nothing

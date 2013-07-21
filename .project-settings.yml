@@ -8,3 +8,15 @@ module-template: ! 'module MODULE_NAME where
 modules:
   Main(src/Main.hs):
     filename: src/Main.hs
+  FoursquareEndpoint:
+    filename: src/FoursquareEndpoint.hs
+  Core:
+    filename: src/Core.hs
+  GeocoderModel:
+    filename: src/GeocoderModel.hs
+  FoursquareModel:
+    filename: src/FoursquareModel.hs
+  Endpoint:
+    filename: src/Endpoint.hs
+  GeocoderEndpoint:
+    filename: src/GeocoderEndpoint.hs

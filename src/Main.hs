@@ -6,7 +6,6 @@ import Network.HTTP.Conduit
 import Data.Aeson
 import Data.Aeson.Types
 import Network.URI
-import Network.HTTP.Types.URI(renderQuery)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as BL
 import Control.Arrow
@@ -14,15 +13,21 @@ import Data.Maybe(catMaybes, fromJust)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as E
 import qualified Data.Vector as V
+import Data.List(intercalate)
+import Control.Monad
+import Network.HTTP(urlEncode)
+import Data.Char(toLower)
 
 import Debug.Trace(trace)
 
 targetAddress = "568 Broadway, New York, NY"
+foursquareApiVersion = "20130721"
 
--- | Simpler variant of renderQuery that deals with plain Strings.
-renderQueryS :: [(String, Maybe String)] -> String
-renderQueryS = B.unpack . renderQuery True . packItems
-  where packItems = map (B.pack *** fmap B.pack)
+renderQuery :: Bool -> [(String, Maybe String)] -> String
+renderQuery b params = (if b then "?" else "") ++ intercalate "&" serializedParams
+  where serializedParams = catMaybes $ map renderParam params
+        renderParam (key, Just val) = Just $ key ++ "=" ++ (urlEncode val)
+        renderParam (_, Nothing) = Nothing
 
 type LatLng = (Double, Double)
 
@@ -35,16 +40,21 @@ class Endpoint a where
 data FoursquareEndpoint =
     VenuesTrendingEndpoint { ll :: LatLng, limit :: Maybe Int, radius :: Maybe Double }
 
+data FoursquareCredentials = FoursquareCredentials { clientId :: String, clientSecret :: String }
+
+data AuthorizedFoursquareEndpoint = AuthorizedFoursquareEndpoint FoursquareCredentials FoursquareEndpoint
+authorizeWith = flip AuthorizedFoursquareEndpoint
+
+instance Endpoint AuthorizedFoursquareEndpoint where
+  buildURI (AuthorizedFoursquareEndpoint creds e) =
+    originalUri ++ "&" ++ renderQuery False authorizationParams
+    where originalUri = buildURI e
+          authorizationParams = [("client_id", Just $ clientId creds),
+                                 ("client_secret", Just $ clientSecret creds),
+                                 ("v", Just foursquareApiVersion)]
+
 withFoursquareResponse :: (Object -> Parser a) -> Value -> Parser a
-withFoursquareResponse f (Object obj) =
-  do meta <- obj .: "meta"
-     (Number code) <- meta .: "code"
-     if floor code /= 200
-       then do errorDetail <- meta .: "errorDetail"
-               fail $ "received non-200 response code (" ++ errorDetail ++ ")"
-       else return ()
-     res <- obj .: "response"
-     f res
+withFoursquareResponse f (Object obj) = obj .: "response" >>= f
 withFoursquareResponse _ _ = fail "expected response object"
 
 data Venue = Venue { venueId :: String, name :: String } deriving Show
@@ -62,8 +72,24 @@ instance FromJSON VenuesTrendingResponse where
                               (String nameText) <- obj .: "name"
                               return $ Venue { venueId = T.unpack idText, name = T.unpack nameText }
 
-packLazyByteString :: String -> BL.ByteString
-packLazyByteString = BL.pack . map (toEnum . fromEnum)
+data GeocodeResponse = GeocodeResponse LatLng deriving Show
+
+navigateJson :: Value-> [String] -> Parser Value
+navigateJson (Object obj) (first : second : rest) =
+  do next <- obj .: (T.pack first)
+     navigateJson next (second : rest)
+navigateJson (Object obj) [last] = obj .: (T.pack last)
+
+convertRational :: (Real a, Fractional b) => a -> b
+convertRational = fromRational . toRational
+
+instance FromJSON GeocodeResponse where
+  parseJSON (Object obj) =
+    do (Array results) <- obj .: "results"
+       (Object location) <- navigateJson (results V.! 0) ["geometry", "location"]
+       (Number lat) <- location .: "lat"
+       (Number lng) <- location .: "lng"
+       return $ GeocodeResponse (convertRational lat, convertRational lng)
 
 callJsonEndpoint :: (FromJSON j, Endpoint e) => e -> IO j
 callJsonEndpoint e =
@@ -78,26 +104,32 @@ callJsonEndpoint e =
 -- https://developers.google.com/maps/documentation/geocoding/
 data GeocoderEndpoint =
   GeocodeEndpoint { address :: String, sensor :: Bool }
-  
+
 instance Endpoint FoursquareEndpoint where
   buildURI VenuesTrendingEndpoint {ll = ll, limit = limit, radius = radius} =
     let params = [("ll", Just $ renderLatLng ll), ("limit", fmap show limit), ("radius", fmap show radius)]
-    in "https://api.foursquare.com/v2/venues/trending" ++ renderQueryS params
+    in "https://api.foursquare.com/v2/venues/trending" ++ renderQuery True params
 
 instance Endpoint GeocoderEndpoint where
   buildURI GeocodeEndpoint { address = address, sensor = sensor } =
-    let params = [("address", Just address), ("sensor", Just $ show sensor)]
-    in "http://maps.googleapis.com/maps/api/geocode/json" ++ renderQueryS params
+    let params = [("address", Just address), ("sensor", Just $ map toLower $ show sensor)]
+    in "http://maps.googleapis.com/maps/api/geocode/json" ++ renderQuery True params
 
 -- | The main entry point.
 main :: IO ()
 main =
+  do geocodeResponse <- (callJsonEndpoint $ GeocodeEndpoint targetAddress False :: IO GeocodeResponse)
+     print geocodeResponse
+{-
   do putStrLn "API key?"
      apiKey <- getLine
      putStrLn "API secret?"
      apiSecret <- getLine
-     venuesTrendingResponse <- (callJsonEndpoint $ VenuesTrendingEndpoint (0.0, 0.0) Nothing Nothing :: IO VenuesTrendingResponse)
+     let creds = FoursquareCredentials apiKey apiSecret
+     let ll = (40.774848,-73.953368)
+     venuesTrendingResponse <- (callJsonEndpoint $ VenuesTrendingEndpoint ll Nothing Nothing `authorizeWith` creds :: IO VenuesTrendingResponse)
      print venuesTrendingResponse
+     -}
 
 --
 

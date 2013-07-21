@@ -18,8 +18,7 @@ instance Endpoint FoursquareEndpoint where
 data AuthorizedFoursquareEndpoint = AuthorizedFoursquareEndpoint FoursquareCredentials FoursquareEndpoint
 
 instance Endpoint AuthorizedFoursquareEndpoint where
-  buildURI (AuthorizedFoursquareEndpoint creds e) =
-    originalUri ++ "&" ++ renderQuery False authorizationParams
+  buildURI (AuthorizedFoursquareEndpoint creds e) = appendParams originalUri authorizationParams
     where originalUri = buildURI e
           authorizationParams = [("client_id", Just $ clientId creds),
                                  ("client_secret", Just $ clientSecret creds),

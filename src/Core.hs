@@ -12,11 +12,11 @@ type LatLng = (Double, Double)
 renderLatLng :: LatLng -> String
 renderLatLng (lat, lng) = show lat ++ "," ++ show lng
 
-navigateJson :: Value-> [String] -> Parser Value
+navigateJson :: Value-> [T.Text] -> Parser Value
 navigateJson (Object obj) (first : second : rest) =
-  do next <- obj .: (T.pack first)
+  do next <- obj .: first
      navigateJson next (second : rest)
-navigateJson (Object obj) [last] = obj .: (T.pack last)
+navigateJson (Object obj) [last] = obj .: last
 
 renderQuery :: Bool -> [(String, Maybe String)] -> String
 renderQuery b params = (if b then "?" else "") ++ intercalate "&" serializedParams

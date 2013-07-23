@@ -13,4 +13,4 @@ instance FromJSON GeocodeResponse where
        (Object location) <- navigateJson (results V.! 0) ["geometry", "location"]
        (Number lat) <- location .: "lat"
        (Number lng) <- location .: "lng"
-       return $ GeocodeResponse (convertRational lat, convertRational lng)
+       return $ GeocodeResponse (realToFrac lat, realToFrac lng)

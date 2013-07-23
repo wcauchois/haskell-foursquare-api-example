@@ -28,6 +28,3 @@ appendParams :: String -> [(String, Maybe String)] -> String
 appendParams uri params
   | isJust (find (=='?') uri) = uri ++ "&" ++ renderQuery False params
   | otherwise = uri ++ renderQuery True params
-
-convertRational :: (Real a, Fractional b) => a -> b
-convertRational = fromRational . toRational

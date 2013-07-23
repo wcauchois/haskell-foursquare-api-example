@@ -10,9 +10,6 @@ class Endpoint a where
 callJsonEndpoint :: (FromJSON j, Endpoint e) => e -> IO j
 callJsonEndpoint e =
   do responseBody <- simpleHttp (buildURI e)
-     responseJson <- case decode responseBody of
-                       Nothing -> fail "endpoint responded with invalid json"
-                       Just json -> return json
-     case parseEither parseJSON responseJson of
+     case eitherDecode responseBody >>= parseEither parseJSON of
        Left err -> fail err
        Right res -> return res

@@ -20,8 +20,8 @@ main =
      apiSecret <- getLine
      let creds = FoursquareCredentials apiKey apiSecret
 
-     (GeocodeResponse latLng) <- (callJsonEndpoint $ GeocodeEndpoint targetAddress False :: IO GeocodeResponse)
+     (GeocodeResponse latLng) <- callJsonEndpoint $ GeocodeEndpoint targetAddress False
      let venuesTrendingEndpoint = VenuesTrendingEndpoint latLng Nothing Nothing `authorizeWith` creds
-     (VenuesTrendingResponse venues) <- (callJsonEndpoint venuesTrendingEndpoint :: IO VenuesTrendingResponse)
+     (VenuesTrendingResponse venues) <- callJsonEndpoint venuesTrendingEndpoint
      let printVenue v = putStrLn $ "- " ++ name v
      mapM_ printVenue venues

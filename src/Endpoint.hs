@@ -12,7 +12,7 @@ callJsonEndpoint e =
   do responseBody <- simpleHttp (buildURI e)
      responseJson <- case decode responseBody of
                        Nothing -> fail "endpoint responded with invalid json"
-                       (Just json) -> return json
+                       Just json -> return json
      case parseEither parseJSON responseJson of
-       (Left err) -> fail err
-       (Right res) -> return res
+       Left err -> fail err
+       Right res -> return res

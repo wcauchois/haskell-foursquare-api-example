@@ -12,7 +12,7 @@ type LatLng = (Double, Double)
 renderLatLng :: LatLng -> String
 renderLatLng (lat, lng) = show lat ++ "," ++ show lng
 
-navigateJson :: Value-> [T.Text] -> Parser Value
+navigateJson :: Value -> [T.Text] -> Parser Value
 navigateJson (Object obj) (first : second : rest) =
   do next <- obj .: first
      navigateJson next (second : rest)

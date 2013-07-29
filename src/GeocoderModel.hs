@@ -8,8 +8,9 @@ import qualified Data.Vector as V
 data GeocodeResponse = GeocodeResponse LatLng deriving Show
 
 instance FromJSON GeocodeResponse where
-  parseJSON (Object obj) =
-    do (Array results) <- obj .: "results"
+  parseJSON val =
+    do let Object obj = val
+       (Array results) <- obj .: "results"
        (Object location) <- navigateJson (results V.! 0) ["geometry", "location"]
        (Number lat) <- location .: "lat"
        (Number lng) <- location .: "lng"

@@ -6,8 +6,9 @@ import qualified Data.Text as T
 import qualified Data.Vector as V
 
 withFoursquareResponse :: (Object -> Parser a) -> Value -> Parser a
-withFoursquareResponse f (Object obj) = obj .: "response" >>= f
-withFoursquareResponse _ _ = fail "expected response object"
+withFoursquareResponse func val = do let Object obj = val
+                                     response <- obj .: "response"
+                                     func response
 
 data Venue = Venue { venueId :: String, name :: String } deriving Show
 
